@@ -444,16 +444,24 @@ function renderSession(){
      +'<div class="arrow" onclick="toggleOpen('+ei+',event)">▾</div>'
      +'</div>';
    h+='<div class="lbls"><span>Set</span><span>Prescribed</span><span>Wt</span><span>Reps</span><span>RPE</span><span></span></div><div class="sets">';
-   if(ei===0){ const wl=(String((sets[0]||{}).load).match(/(\d+)/)||[])[1];
-     h+='<div class="warmup">🔥 '+(wl?warmupRamp(wl):'Warm-up: 2–3 progressively heavier sets before your work sets.')+'</div>'; }
    const removed=(log.removed&&log.removed[ei])||[];
    const extra=(log.extra&&log.extra[ei])||0;
    const total=sets.length+extra;
+   let prevBase=null, prevDisp=null, prevTReps=null, prevTRpe=null, prevLog=null;
    for(let si=0; si<total; si++){
      if(removed.indexOf(si)>=0) continue;
      const st=sets[si]; const id=ei+'_'+si; const sv=log.sets[id]||{};
-     const wtPh=st?((String(st.load).match(/(\d+)/)||[])[1]||'lb'):'lb';
-     const presc=st?((st.load?st.load+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'')+' <small>@RPE'+st.rpe+'</small>'):'<small style="color:var(--muted)">added set</small>';
+     let baseW = st?parseInt((String(st.load).match(/(\d+)/)||[])[1]):null; if(isNaN(baseW))baseW=null;
+     let dispW=baseW, adjusted=false;
+     // intelligent carry: recommend this set's weight from the previous set's logged result
+     if(baseW!=null && prevBase===baseW && prevLog && (prevLog.areps||prevLog.arpe)){
+       const basis=parseFloat(prevLog.awt)||prevDisp;
+       dispW=autoNext(basis, prevTReps, prevTRpe, parseInt(prevLog.areps), parseFloat(prevLog.arpe));
+       if(dispW!==baseW) adjusted=true;
+     }
+     const wtPh = dispW!=null? dispW : 'lb';
+     const loadTxt = st?(st.load?(dispW!=null? dispW+' lb' : st.load):''):'';
+     const presc=st?((loadTxt?loadTxt+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'')+' <small>@RPE'+st.rpe+'</small>'+(adjusted?' <small style="color:#9ec5ff">↻ from '+baseW+'</small>':'')):'<small style="color:var(--muted)">added set</small>';
      h+='<div class="setrow">'
        +'<div class="sn">'+(si+1)+'</div>'
        +'<div class="prescribe">'+presc+'</div>'
@@ -462,6 +470,7 @@ function renderSession(){
        +'<input inputmode="decimal" placeholder="rpe" value="'+(sv.arpe||'')+'" onchange="logRPE('+ei+','+si+',this.value)">'
        +'<div class="rmset" onclick="removeSet('+ei+','+si+')">×</div>'
        +'</div>';
+     prevBase=baseW; prevDisp=dispW; prevTReps=st?st.reps:null; prevTRpe=st?st.rpe:null; prevLog=log.sets[id];
    }
    h+='<button class="addset" onclick="addSet('+ei+',event)">+ Add set</button>';
    h+='</div>';div.innerHTML=h;wrap.appendChild(div);
@@ -498,11 +507,16 @@ function logRPE(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets
 function logWt(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].awt=v;save();updateProgress();renderSession();}
 function addSet(ei,e){if(e)e.stopPropagation();const l=ensure(view.w,view.d);l.extra[ei]=(l.extra[ei]||0)+1;save();renderSession();}
 function removeSet(ei,si){const l=ensure(view.w,view.d);l.removed[ei]=l.removed[ei]||[];if(l.removed[ei].indexOf(si)<0)l.removed[ei].push(si);save();updateProgress();renderSession();}
-// warm-up ramp from the working weight
-function warmupRamp(workWeight){
- const w=parseInt(workWeight)||0; if(!w) return 'Warm-up: 2–3 progressively heavier sets.';
- const r=p=>Math.round(w*p/5)*5;
- return 'Warm-up: 45×10 · '+r(.5)+'×5 · '+r(.7)+'×3 · '+r(.85)+'×2 → work sets';
+// intelligent next-set recommendation: steer load toward target RPE based on the prior set
+function autoNext(weight, tReps, tRpe, reps, rpe){
+ if(!weight) return weight;
+ if(!reps && !rpe) return weight;
+ const r = reps||tReps||4;
+ let eff = rpe||tRpe||8;
+ if(tReps && r<tReps) eff += (tReps - r);          // missed reps = effectively harder
+ let pct = ((tRpe||8) - eff) * 0.03;               // ~3% load per RPE point off target
+ pct = Math.max(-0.10, Math.min(0.05, pct));       // cap swings: -10% .. +5%
+ return Math.round(weight*(1+pct)/5)*5;            // nearest 5 lb
 }
 function shiftDay(n){let idx=view.w*5+view.d+n;idx=Math.max(0,Math.min(29,idx));view.w=Math.floor(idx/5);view.d=idx%5;DB.pos={...view};save();renderSession();}
 
@@ -614,15 +628,10 @@ function tab(name,btn){
 syncFeed();loadCheckin();renderReady();renderSession();updateProgress();renderFood();
 
 async function loadCloud(){
- try{
-   const r=await fetch('data/today.json?_='+Date.now(),{cache:'no-store'});
-   if(!r.ok)return;const d=await r.json();if(!d||!d.date)return;
-   window.READINESS_FEED=window.READINESS_FEED||{};
-   window.READINESS_FEED[d.date]={tr:d.tr,sleepHrs:d.sleepHrs,sleepScore:d.sleepScore};
+ try{const r=await fetch('data/today.json?_='+Date.now(),{cache:'no-store'});if(!r.ok)return;const d=await r.json();if(!d||!d.date)return;
+   window.READINESS_FEED=window.READINESS_FEED||{};window.READINESS_FEED[d.date]={tr:d.tr,sleepHrs:d.sleepHrs,sleepScore:d.sleepScore};
    if(syncFeed()){loadCheckin();renderReady();renderSession();updateProgress();}
-   const el=document.getElementById('ciStatus');
-   if(el&&d.fetchedAt)el.textContent='✓ Auto from Garmin · Readiness '+d.tr+'/100';
- }catch(e){}
+   const el=document.getElementById('ciStatus');if(el&&d.fetchedAt)el.textContent='✓ Auto from Garmin · Readiness '+d.tr+'/100';}catch(e){}
 }
 loadCloud();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js').catch(()=>{});}
