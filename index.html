@@ -295,6 +295,19 @@ DB.pos = DB.pos||{w:0,d:0}; // current view
 DB.bench = DB.bench || {weight:255, progressed:{}, sessionWeights:{}, lastReco:''}; // APRE state
 DB.bench.progressed = DB.bench.progressed||{};
 DB.bench.sessionWeights = DB.bench.sessionWeights||{};
+DB.lifts = DB.lifts || {}; // learned working weight per exercise: {name:{weight,used}}
+// starting estimates (only used until you've logged the lift once — then it learns your real weight)
+const SEED = {
+ 'Close-Grip Bench Press':205,'Incline DB Press':70,'Weighted Dips':45,'Overhead Rope Extension':50,'Cable Fly':30,
+ 'Barbell Row':185,'Pull-ups':0,'Lat Pulldown':150,'Chest-Supported Row':90,'Face Pulls':40,'Barbell Curl':75,'Hammer Curl':35,
+ 'Back Squat':225,'Romanian Deadlift':185,'Leg Press':360,'Leg Curl':90,'Standing Calf Raise':120,'Hanging Leg Raise':0,
+ 'Pin Press':245,'Overhead Press':135,'JM Press':95,'Lateral Raise':20,'Seated DB Shoulder Press':60,'Skullcrusher':65,
+ 'Triceps Pushdown':60,'Rear Delt Fly':20
+};
+function liftWeight(name){
+ if(DB.lifts[name]&&DB.lifts[name].weight) return DB.lifts[name].weight;
+ const s=SEED[name]; return (s===undefined?null:(s||null));
+}
 function save(){localStorage.setItem('b315',JSON.stringify(DB));}
 const todayKey=()=>new Date().toISOString().slice(0,10);
 
@@ -335,6 +348,32 @@ function applyProgression(){
      save();
    }
  }
+}
+// learn every other lift from what you actually did (weight + reps + RPE), for next time
+function learnLifts(){
+ const WK=currentWeeks();
+ for(const k in DB.logs){
+   const log=DB.logs[k]; if(!log||!log.sets) continue;
+   const parts=k.split('-'); const w=+parts[0], d=+parts[1];
+   if(!WK[w]||!WK[w][d]) continue;
+   WK[w][d].ex.forEach((ex,ei)=>{
+     if(d===0&&ei===0&&w!==5) return;       // heavy bench handled by APRE
+     let bestW=0,hit=false,n=0,sumRpe=0;
+     ex.sets.forEach((st,si)=>{const s=log.sets[ei+'_'+si];
+       if(s&&s.awt){const wt=parseFloat(s.awt)||0; if(wt>bestW)bestW=wt;
+         const reps=parseInt(s.areps)||0; const rpe=parseFloat(s.arpe)||0;
+         if(rpe){sumRpe+=rpe;n++;} if(reps>=st.reps)hit=true;}
+     });
+     if(bestW>0){
+       const avg=n?sumRpe/n:0; let next=bestW;
+       if(hit && avg && avg<=7.5) next=bestW+5;        // easy → progress
+       else if(hit && avg && avg<=8.5) next=bestW+5;   // solid → small bump
+       next=Math.round(next/5)*5;
+       DB.lifts[ex.nm]={weight:next, used:bestW};
+     }
+   });
+ }
+ save();
 }
 // live mid-workout correction for the heavy day.
 // Philosophy: failure ISN'T bad — but failing EARLY in a 4×4 costs you the remaining
@@ -447,11 +486,13 @@ function renderSession(){
    const removed=(log.removed&&log.removed[ei])||[];
    const extra=(log.extra&&log.extra[ei])||0;
    const total=sets.length+extra;
+   const exBase=(d===0&&ei===0&&w!==5)?null:liftWeight(ex.nm); // learned/seed weight for non-heavy-bench lifts
    let prevBase=null, prevDisp=null, prevTReps=null, prevTRpe=null, prevLog=null;
    for(let si=0; si<total; si++){
      if(removed.indexOf(si)>=0) continue;
      const st=sets[si]; const id=ei+'_'+si; const sv=log.sets[id]||{};
      let baseW = st?parseInt((String(st.load).match(/(\d+)/)||[])[1]):null; if(isNaN(baseW))baseW=null;
+     if(baseW==null && st) baseW=exBase;  // fall back to the exercise's learned weight
      let dispW=baseW, adjusted=false;
      // intelligent carry: recommend this set's weight from the previous set's logged result
      if(baseW!=null && prevBase===baseW && prevLog && (prevLog.areps||prevLog.arpe)){
@@ -460,7 +501,7 @@ function renderSession(){
        if(dispW!==baseW) adjusted=true;
      }
      const wtPh = dispW!=null? dispW : 'lb';
-     const loadTxt = st?(st.load?(dispW!=null? dispW+' lb' : st.load):''):'';
+     const loadTxt = st?(dispW!=null? dispW+' lb' : (st.load||'')):'';
      const presc=st?((loadTxt?loadTxt+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'')+' <small>@RPE'+st.rpe+'</small>'+(adjusted?' <small style="color:#9ec5ff">↻ from '+baseW+'</small>':'')):'<small style="color:var(--muted)">added set</small>';
      h+='<div class="setrow">'
        +'<div class="sn">'+(si+1)+'</div>'
@@ -562,6 +603,7 @@ function collect1RM(){
 }
 function updateProgress(){
  applyProgression();
+ learnLifts();
  const pts=collect1RM();
  const best=pts.reduce((a,p)=>Math.max(a,p.y),START1RM);
  document.getElementById('cur1rm').textContent=best;
