@@ -1,1 +1,37 @@
-.github/workflows/daily.yml
+name: Daily Garmin pull
+
+on:
+  schedule:
+    # 11:40 UTC ≈ 6:40 AM US Central. Adjust the hour for your timezone.
+    - cron: "40 11 * * *"
+  workflow_dispatch:   # lets you run it manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Pull today's Garmin data
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+        run: python update.py
+
+      - name: Commit today's data
+        run: |
+          git config user.name "bench315-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/today.json
+          git commit -m "Update readiness $(date -u +%F)" || echo "no changes"
+          git push
