@@ -1,5 +1,5 @@
-// Bench 315 service worker — offline shell, always fetch fresh readiness data
-const CACHE = 'bench315-v1';
+// Bench 315 service worker — network-first so updates always show; cache is offline fallback.
+const CACHE = 'bench315-v2';
 const SHELL = ['index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-180.png'];
 
 self.addEventListener('install', e => {
@@ -13,12 +13,15 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  // today's data: always go to network first so readiness is current
-  if (url.pathname.endsWith('today.json')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-    return;
-  }
-  // app shell: cache first, fall back to network
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  if (e.request.method !== 'GET') return;
+  // Network-first: always try the freshest file; fall back to cache when offline.
+  e.respondWith(
+    fetch(e.request)
+      .then(resp => {
+        const copy = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        return resp;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });
