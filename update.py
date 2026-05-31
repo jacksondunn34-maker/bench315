@@ -1,35 +1,87 @@
 #!/usr/bin/env python3
 """
-Bench 315 — daily Garmin pull.
-Runs once a day (GitHub Action). Logs into Garmin Connect, reads today's
-Training Readiness, sleep, and resting HR, computes a readiness color, and
-writes data/today.json which the phone web app reads.
+Bench 315 — daily Garmin pull (token-based, with retries).
 
-Garmin credentials come from environment variables (GitHub Secrets):
-  GARMIN_EMAIL, GARMIN_PASSWORD
+Logs into Garmin ONCE using email/password, then caches an OAuth token in
+~/.garminconnect. Future runs reuse that token (no password login), which avoids
+Garmin's rate-limiting (HTTP 429) on cloud IPs. The GitHub Action caches the token
+folder between runs.
+
+Env (GitHub Secrets):  GARMIN_EMAIL, GARMIN_PASSWORD
+Optional env:          GARMINTOKENS  (token dir; defaults to ~/.garminconnect)
 """
-import os, json, datetime, sys
+import os, json, time, datetime, sys
 
 EMAIL = os.environ.get("GARMIN_EMAIL")
 PASSWORD = os.environ.get("GARMIN_PASSWORD")
+TOKENSTORE = os.environ.get("GARMINTOKENS", os.path.expanduser("~/.garminconnect"))
 
-# your recovery baselines (edit if your normals change)
-HRV_BASELINE = 60      # ms
-RHR_BASELINE = 52      # bpm
-SLEEP_TARGET = 8.0     # hours
+# recovery baselines (used only for the fallback score if Training Readiness is missing)
+RHR_BASELINE = 52
+SLEEP_TARGET = 8.0
 
 OUT = os.path.join(os.path.dirname(__file__), "data", "today.json")
 
 
 def color_from(tr, sleep_hrs, rhr):
-    """Prefer Garmin Training Readiness; else compute from sleep + resting HR."""
-    if tr:
+    if tr is not None:
         return "green" if tr >= 80 else "yellow" if tr >= 60 else "orange" if tr >= 40 else "red"
-    # fallback score /100: sleep 50, resting HR 50
     s = min(50, (sleep_hrs or 0) / SLEEP_TARGET * 50)
     r = min(50, RHR_BASELINE / rhr * 50) if rhr else 25
     score = round(s + r)
     return "green" if score >= 80 else "yellow" if score >= 60 else "orange" if score >= 40 else "red"
+
+
+def seed_token_from_secret():
+    """If a base64 token secret is provided, unpack it into the token store."""
+    b64 = os.environ.get("GARMIN_TOKEN_B64")
+    if not b64:
+        return
+    import base64, io, tarfile
+    try:
+        os.makedirs(TOKENSTORE, exist_ok=True)
+        with tarfile.open(fileobj=io.BytesIO(base64.b64decode(b64)), mode="r:gz") as t:
+            t.extractall(TOKENSTORE)
+        print("Seeded token store from secret.")
+    except Exception as e:
+        print("Could not unpack GARMIN_TOKEN_B64:", e, file=sys.stderr)
+
+
+def connect():
+    """Return a logged-in Garmin client, reusing a cached token when possible."""
+    from garminconnect import Garmin
+
+    seed_token_from_secret()
+
+    # 1) try cached token (no password login -> no rate limit)
+    if os.path.isdir(TOKENSTORE) and os.listdir(TOKENSTORE):
+        try:
+            g = Garmin()
+            g.login(TOKENSTORE)
+            print("Logged in with cached token.")
+            return g
+        except Exception as e:
+            print("Cached token unusable, will do a fresh login:", e, file=sys.stderr)
+
+    # 2) fresh password login, with retries to ride out temporary 429 throttling
+    last = None
+    for attempt in range(1, 6):
+        try:
+            g = Garmin(EMAIL, PASSWORD)
+            g.login()
+            try:
+                g.garth.dump(TOKENSTORE)   # save token so tomorrow needs no password login
+                print("Saved token to", TOKENSTORE)
+            except Exception as e:
+                print("Could not save token:", e, file=sys.stderr)
+            print(f"Fresh login OK on attempt {attempt}.")
+            return g
+        except Exception as e:
+            last = e
+            print(f"Login attempt {attempt} failed: {e}", file=sys.stderr)
+            time.sleep(30)
+    print("All login attempts failed:", last, file=sys.stderr)
+    return None
 
 
 def main():
@@ -40,15 +92,10 @@ def main():
 
     if not EMAIL or not PASSWORD:
         print("ERROR: GARMIN_EMAIL / GARMIN_PASSWORD not set", file=sys.stderr)
-        # still write a neutral file so the app keeps working
         _write(data); return
 
-    try:
-        from garminconnect import Garmin
-        g = Garmin(EMAIL, PASSWORD)
-        g.login()
-
-        # Training Readiness (Garmin-proprietary 0-100)
+    g = connect()
+    if g is not None:
         try:
             tr = g.get_training_readiness(today)
             if isinstance(tr, list) and tr:
@@ -57,32 +104,23 @@ def main():
                 data["tr"] = tr.get("score")
         except Exception as e:
             print("training_readiness unavailable:", e, file=sys.stderr)
-
-        # Sleep
         try:
             sleep = g.get_sleep_data(today)
             dto = (sleep or {}).get("dailySleepDTO", {}) or {}
-            secs = dto.get("sleepTimeSeconds")
-            if secs:
-                data["sleepHrs"] = round(secs / 3600, 1)
+            if dto.get("sleepTimeSeconds"):
+                data["sleepHrs"] = round(dto["sleepTimeSeconds"] / 3600, 1)
             score = (dto.get("sleepScores") or {}).get("overall", {}).get("value")
             if score:
                 data["sleepScore"] = score
         except Exception as e:
             print("sleep unavailable:", e, file=sys.stderr)
-
-        # Resting HR
         try:
             rhr = g.get_rhr_day(today)
-            metrics = (rhr or {}).get("allMetrics", {}).get("metricsMap", {})
-            vals = metrics.get("WELLNESS_RESTING_HEART_RATE", [])
+            vals = (rhr or {}).get("allMetrics", {}).get("metricsMap", {}).get("WELLNESS_RESTING_HEART_RATE", [])
             if vals:
                 data["restingHR"] = vals[0].get("value")
         except Exception as e:
             print("resting HR unavailable:", e, file=sys.stderr)
-
-    except Exception as e:
-        print("Garmin login/pull failed:", e, file=sys.stderr)
 
     data["color"] = color_from(data["tr"], data["sleepHrs"], data["restingHR"])
     _write(data)
