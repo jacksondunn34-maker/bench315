@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-title" content="Bench 315">
+<title>Bench 315</title>
+<style>
+:root{
+  --bg:#0d1117;--card:#161b22;--card2:#1c2230;--line:#283041;
+  --txt:#e6edf3;--muted:#8b949e;--accent:#f0a020;--accent2:#3b82f6;
+  --green:#2ea043;--yellow:#d29922;--orange:#db6d28;--red:#da3633;
+  --radius:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+body{padding:0 0 90px;max-width:560px;margin:0 auto;}
+header{padding:18px 16px 10px;position:sticky;top:0;background:linear-gradient(180deg,#0d1117 70%,rgba(13,17,23,0));z-index:5}
+.h-title{font-size:13px;letter-spacing:2px;color:var(--accent);font-weight:700;text-transform:uppercase}
+.h-goal{display:flex;align-items:baseline;gap:8px;margin-top:2px}
+.h-goal b{font-size:30px;font-weight:800}
+.h-goal span{color:var(--muted);font-size:14px}
+.bar{height:8px;background:var(--line);border-radius:6px;margin-top:10px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#f7c948);border-radius:6px;transition:width .6s}
+.bar-lbl{font-size:11px;color:var(--muted);margin-top:5px}
+section{padding:0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:12px 0}
+.readiness{display:flex;align-items:center;gap:14px}
+.dot{width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#0d1117}
+.r-txt b{display:block;font-size:15px}
+.r-txt span{font-size:12.5px;color:var(--muted);line-height:1.35;display:block;margin-top:2px}
+.sess-head{display:flex;justify-content:space-between;align-items:flex-end;margin:4px 2px 2px}
+.sess-head h2{margin:0;font-size:19px}
+.sess-head .focus{color:var(--accent);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.daynav{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:13px}
+.daynav button{background:var(--card2);border:1px solid var(--line);color:var(--txt);width:34px;height:34px;border-radius:10px;font-size:18px}
+.ex{border:1px solid var(--line);border-radius:14px;margin:10px 0;overflow:hidden;background:var(--card2)}
+.ex.main{border-color:var(--accent)}
+.ex-h{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.ex-h .nm{font-weight:700;font-size:15px;flex:1;min-width:0}
+.ex-h .nm .ex-sum{display:block;color:var(--accent);font-weight:700;font-size:12px;margin-top:2px}
+.ex-h .nm small{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:1px}
+.arrow{width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px;transition:transform .2s;border:1px solid var(--line);border-radius:10px}
+.ex.open .arrow{transform:rotate(180deg);color:var(--accent)}
+.tag{font-size:10px;background:var(--accent);color:#0d1117;font-weight:800;padding:2px 7px;border-radius:6px;text-transform:uppercase}
+.sets,.lbls{display:none}
+.ex.open .sets{display:block;padding:0 10px 8px}
+.ex.open .lbls{display:grid}
+.setrow{display:grid;grid-template-columns:24px 1fr 40px 56px;gap:8px;align-items:center;padding:8px 4px;border-top:1px solid var(--line)}
+.setrow .sn{color:var(--muted);font-size:12px;text-align:center;font-weight:700}
+.setrow .prescribe{font-size:14px}
+.setrow .prescribe b{color:var(--accent);font-weight:700}
+.setrow .prescribe small{color:var(--muted);font-size:11px}
+.setrow .rpe{text-align:center;font-size:10px;color:var(--muted)}
+.setrow .rpe b{display:block;color:var(--txt);font-size:14px;font-weight:700}
+.setrow input{width:100%;background:#0d1117;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 2px;text-align:center;font-size:15px}
+.setrow input::placeholder{color:#4b5563}
+.chk{width:34px;height:34px;border-radius:10px;border:2px solid var(--line);background:#0d1117;display:flex;align-items:center;justify-content:center;font-size:19px;color:transparent}
+.chk.on{background:var(--green);border-color:var(--green);color:#fff}
+.lbls{grid-template-columns:24px 1fr 40px 56px;gap:8px;padding:4px 4px 0;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+.lbls span:nth-child(2){text-align:left}
+.nav{position:fixed;bottom:0;left:0;right:0;max-width:560px;margin:0 auto;display:flex;background:var(--card);border-top:1px solid var(--line);padding:8px 4px env(safe-area-inset-bottom)}
+.nav button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;padding:6px 2px;font-weight:600}
+.nav button .ic{display:block;font-size:20px;margin-bottom:2px}
+.nav button.active{color:var(--accent)}
+.tab{display:none}.tab.active{display:block}
+h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:18px 2px 6px}
+.food-add{display:flex;gap:8px}
+.food-add input{flex:1;background:#0d1117;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px;font-size:14px}
+.food-add button,.btn{background:var(--accent);color:#0d1117;border:none;border-radius:10px;padding:0 16px;font-weight:800;font-size:14px}
+.foodrow{display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.foodrow small{color:var(--muted)}
+.macro{display:flex;gap:10px;margin:8px 0}
+.macro .m{flex:1;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.macro .m b{display:block;font-size:20px}
+.macro .m span{font-size:10px;color:var(--muted);text-transform:uppercase}
+.weekrow{display:flex;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--line)}
+.weekrow.done{opacity:.5}
+.weekrow b{font-size:14px}.weekrow small{color:var(--muted);font-size:12px}
+.pill{font-size:10px;padding:3px 8px;border-radius:20px;background:var(--card2);border:1px solid var(--line);color:var(--muted)}
+canvas{margin-top:10px}
+.note{font-size:12px;color:var(--muted);line-height:1.5}
+.set-deload{background:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(255,255,255,.02) 8px,rgba(255,255,255,.02) 16px)}
+.empty{color:var(--muted);text-align:center;padding:30px;font-size:14px}
+.adjust{background:rgba(219,109,40,.15);border:1px solid var(--orange);color:#f0a060;border-radius:12px;padding:11px 14px;margin:12px 0 0;font-size:12.5px;line-height:1.4}
+.adjust.red{background:rgba(218,54,51,.15);border-color:var(--red);color:#f08080}
+.adjust.green{background:rgba(46,160,67,.13);border-color:var(--green);color:#5fd07f}
+.rbtns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.rbtns button{flex:1;min-width:60px;padding:9px 4px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--txt);font-size:12px;font-weight:600}
+.ci-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ci-grid label{display:flex;flex-direction:column;font-size:11px;color:var(--muted);gap:3px}
+.ci-grid input{background:#0d1117;border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:10px;font-size:15px}
+.painrow{display:flex;flex-wrap:wrap;gap:6px}
+.painrow button{flex:1;min-width:64px;padding:8px 4px;border-radius:9px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600}
+.painrow button.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.painrow button[data-p="None"].on{background:var(--green);border-color:var(--green)}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-title">⛓ Operation 315</div>
+  <div class="h-goal"><b id="cur1rm">305</b><span>→ 315 lb &nbsp;bench 1RM</span></div>
+  <div class="bar"><i id="goalbar"></i></div>
+  <div class="bar-lbl" id="goallbl"></div>
+</header>
+
+<!-- TODAY -->
+<div class="tab active" id="tab-today">
+<section>
+  <div class="card readiness" id="readinessCard">
+    <div class="dot" id="rDot">--</div>
+    <div class="r-txt"><b id="rTitle">Recovery: not set</b>
+      <span id="rDesc">Tap to set today's readiness (or I'll set it from your Garmin scrape each morning).</span></div>
+  </div>
+  <div class="card" id="checkinCard">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:14px">☀️ Morning Check-in</b>
+      <small id="ciStatus" style="color:var(--muted);font-size:11px"></small>
+    </div>
+    <div class="note" style="margin:4px 0 8px">Auto-filled from your Garmin Training Readiness each morning. Numbers below are just an override if you want to tweak it.</div>
+    <div class="ci-grid">
+      <label style="grid-column:span 2">Garmin Training Readiness (0–100)<input id="ciTR" inputmode="numeric" placeholder="e.g. 74"></label>
+      <label>Sleep (hrs)<input id="ciSleepHrs" inputmode="decimal" placeholder="e.g. 7.5"></label>
+      <label>Sleep score<input id="ciSleepScore" inputmode="numeric" placeholder="0–100"></label>
+    </div>
+    <button class="btn" style="width:100%;padding:12px;margin-top:10px" onclick="computeCheckin()">Set today's readiness →</button>
+  </div>
+  <div class="note" style="margin:-4px 2px 2px;color:var(--muted)">…or set it manually:</div>
+  <div class="rbtns">
+    <button onclick="setReady('green')">🟢 Push</button>
+    <button onclick="setReady('yellow')">🟡 Normal</button>
+    <button onclick="setReady('orange')">🟠 Moderate</button>
+    <button onclick="setReady('red')">🔴 Recover</button>
+  </div>
+
+  <div class="sess-head">
+    <div><div class="focus" id="sFocus"></div><h2 id="sName"></h2></div>
+    <div class="daynav">
+      <button onclick="shiftDay(-1)">‹</button>
+      <span id="dLabel"></span>
+      <button onclick="shiftDay(1)">›</button>
+    </div>
+  </div>
+  <div id="adjBanner"></div>
+  <div id="exList"></div>
+  <div class="note" id="sessNote" style="margin:6px 2px 0"></div>
+</section>
+</div>
+
+<!-- WEEK / PROGRAM -->
+<div class="tab" id="tab-week">
+<section>
+  <h3 class="sec">6-Week Peaking Block</h3>
+  <div class="card" id="weekList"></div>
+  <div class="note">One heavy 4×4 a week (D1) — your proven driver, +5 lb whenever you hit all four reps clean — paired with a lighter volume + lockout bench day (D4). Accessories target your triceps/lockout sticking point (close-grip, pin press, JM press, overhead extensions). Week 6 is your off-week: deload, then test 315. Everything autoregulates to your daily readiness.</div>
+</section>
+</div>
+
+<!-- PROGRESS -->
+<div class="tab" id="tab-progress">
+<section>
+  <h3 class="sec">Estimated Bench 1RM</h3>
+  <div class="card"><canvas id="chart" height="180"></canvas>
+    <div class="note" id="prBest"></div></div>
+  <h3 class="sec">Volume (weekly bench sets)</h3>
+  <div class="card"><div id="volList" class="note"></div></div>
+</section>
+</div>
+
+<!-- FOOD -->
+<div class="tab" id="tab-food">
+<section>
+  <h3 class="sec">Today's Fuel</h3>
+  <div class="macro">
+    <div class="m"><b id="mProt">0</b><span>Protein g</span></div>
+    <div class="m"><b id="mTgt">0</b><span>Target g</span></div>
+    <div class="m"><b id="mMeals">0</b><span>Meals</span></div>
+  </div>
+  <div class="food-add">
+    <input id="foodIn" placeholder="e.g. chicken + rice, ~50g protein">
+    <button onclick="addFood()">Add</button>
+  </div>
+  <div class="note" style="margin-top:6px">Just type or dictate what you ate — I'll also slot in meals from your voice messages. Add a number like "40g" and it counts toward protein.</div>
+  <div id="foodList" style="margin-top:8px"></div>
+</section>
+</div>
+
+<nav class="nav">
+  <button class="active" data-t="today" onclick="tab('today',this)"><span class="ic">🏋️</span>Today</button>
+  <button data-t="week" onclick="tab('week',this)"><span class="ic">📅</span>Block</button>
+  <button data-t="progress" onclick="tab('progress',this)"><span class="ic">📈</span>Progress</button>
+  <button data-t="food" onclick="tab('food',this)"><span class="ic">🍽️</span>Food</button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script>
+// >>> READINESS_FEED — auto-updated each morning by the Garmin scrape task. Do not edit by hand.
+window.READINESS_FEED = {
+};
+// <<< END READINESS_FEED
+</script>
+<script>
+// ---------- CONFIG ----------
+const TM = 300;          // training max for % work
+const GOAL = 315, START1RM = 305;
+const BODYWEIGHT = 185;  // lb  (edit if needed)
+const PROTEIN_TGT = Math.round(BODYWEIGHT/2.205*1.8); // 1.8 g/kg
+const r5 = w => Math.round(w/5)*5;
+const pct = p => r5(TM*p);
+// build n identical set rows: {reps, load, rpe, tag}
+const mk = (n,reps,o={}) => Array.from({length:n},()=>({reps,load:o.load||'',rpe:o.rpe||8,tag:o.tag||''}));
+
+// ---------- PROGRAM (6 weeks x 5 days) — built around 2× weekly 4×4 ----------
+const WARMUP='135×10, 225×3 → working';
+// THE one heavy 4×4 (D1). Starts at your current 255 (5/26), +5lb/wk. Wk6 = 315 test.
+const p44 = [255,260,265,270,275,'TEST'];
+// D4 volume bench (paused), ~68-72% — supports the 4×4 without a second max day.
+const pvol = [205,210,215,220,225,'light'];
+
+function buildWeek(w){ // w = 0..5
+ const deload = (w===5);
+ const pw=p44[w], vw=pvol[w];
+ const primer={2:295,4:310}[w]; // practice singles in wk3 & wk5
+ let heavyBench = deload
+   ? mk(1,1,{load:'work to 315',rpe:10,tag:'TEST'})
+   : mk(4,4,{load:pw+' lb',rpe:(w>=3?9:8)}).concat(mk(1,6,{load:(pw-30)+' lb',rpe:7,tag:'back-off'}));
+ if(primer) heavyBench=heavyBench.concat(mk(1,1,{load:'work up to '+primer+' lb',rpe:9,tag:'practice single'}));
+ const volBench = deload
+   ? mk(3,5,{load:'185 lb',rpe:6,tag:'light technique'})
+   : mk(4,8,{load:vw+' lb',rpe:8,tag:'paused'});
+ return [
+  {name:'Bench 4×4 — Heavy + Push', focus:'Primary 4×4', note: deload?'Peak week — fully rested. Warm up smart (135×10, 225×3), then chase 315.':(primer?'PRACTICE-SINGLE WEEK. Do your 4×4, then work up to a heavy single at '+primer+' — focus on tight setup, leg drive and a hard brace so 315 feels familiar on test day. Don\'t grind a fail.':'THE session. Warm up 135×10, 225×3. Rest 3-4 min between the 4×4 sets. Hit all 4 clean → +5lb next week. No legs today.'), ex:[
+    {nm:'Bench Press', sub:'heavy 4×4 — your driver', main:true, sets:heavyBench},
+    {nm:'Close-Grip Bench Press', sub:'heavy triceps & lockout overload', sets:mk(3,6,{rpe:8})},
+    {nm:'Incline DB Press', sub:'upper chest', sets:mk(3,10)},
+    {nm:'Weighted Dips', sub:'triceps & lower chest', sets:mk(3,8)},
+    {nm:'Overhead Rope Extension', sub:'triceps long head (lockout)', sets:mk(3,12)},
+    {nm:'Cable Fly', sub:'chest volume', sets:mk(3,15)},
+  ]},
+  {name:'Back + Biceps', focus:'Pull day', note:'A strong, stable back keeps the bar path tight and lets your pressing muscles recover between bench days.', ex:[
+    {nm:'Barbell Row', sub:'upper back thickness', sets:mk(4,8)},
+    {nm:'Pull-ups', sub:'lats', sets:mk(4,8,{rpe:9})},
+    {nm:'Lat Pulldown', sub:'lats volume', sets:mk(3,10)},
+    {nm:'Chest-Supported Row', sub:'mid back', sets:mk(3,10)},
+    {nm:'Face Pulls', sub:'rear delt / shoulder health', sets:mk(3,15,{rpe:7})},
+    {nm:'Barbell Curl', sub:'biceps', sets:mk(3,10)},
+    {nm:'Hammer Curl', sub:'brachialis / forearm', sets:mk(3,12)},
+  ]},
+  {name:'Legs', focus:'Lower body', note:'Squat & RDL kept at RPE7 so legs build without stealing recovery from your bench days.', ex:[
+    {nm:'Back Squat', sub:'leg strength', sets:mk(3,5,{rpe:7})},
+    {nm:'Romanian Deadlift', sub:'hamstrings / posterior chain', sets:mk(3,8,{rpe:7})},
+    {nm:'Leg Press', sub:'quads', sets:mk(3,12,{rpe:7})},
+    {nm:'Leg Curl', sub:'hamstrings', sets:mk(3,12)},
+    {nm:'Standing Calf Raise', sub:'calves', sets:mk(4,15)},
+    {nm:'Hanging Leg Raise', sub:'core / bracing', sets:mk(3,12)},
+  ]},
+  {name:'Bench Volume + Lockout', focus:'Volume bench', note:'Your second bench day — NOT a max effort. Paused reps (1-sec on the chest) plus lockout overload to hammer your sticking point. Drives strength without a second heavy day.', ex:[
+    {nm:'Paused Bench Press', sub:'volume / technique', main:true, sets:volBench},
+    {nm:'Pin Press', sub:'overloads your exact lockout height', sets:mk(4,3,{rpe:8})},
+    {nm:'Overhead Press', sub:'vertical press / triceps', sets:mk(4,6)},
+    {nm:'Incline DB Press', sub:'upper chest', sets:mk(3,10)},
+    {nm:'JM Press', sub:'triceps lockout specialist', sets:mk(3,8)},
+    {nm:'Lateral Raise', sub:'side delt', sets:mk(3,15)},
+  ]},
+  {name:'Arms + Shoulders', focus:'Triceps emphasis', note:'Triceps-led pump work — your lockout muscles — plus shoulder balance. Lighter joints-friendly volume to finish the week.', ex:[
+    {nm:'Seated DB Shoulder Press', sub:'delts / triceps', sets:mk(3,10)},
+    {nm:'Skullcrusher', sub:'triceps mass', sets:mk(3,12)},
+    {nm:'Triceps Pushdown', sub:'triceps volume', sets:mk(3,15)},
+    {nm:'Overhead Rope Extension', sub:'triceps long head', sets:mk(3,12)},
+    {nm:'Lateral Raise', sub:'side delt', sets:mk(4,15)},
+    {nm:'Rear Delt Fly', sub:'shoulder health', sets:mk(3,15)},
+  ]},
+ ];
+}
+const WEEKS=[0,1,2,3,4,5].map(buildWeek);
+const WK_LABELS=['Wk1 · 4×4 @255','Wk2 · 4×4 @260','Wk3 · 4×4 @265 + single 295','Wk4 · 4×4 @270','Wk5 · 4×4 @275 + single 310','Wk6 · Deload + Test 315'];
+
+// ---------- STATE ----------
+const DB = JSON.parse(localStorage.getItem('b315')||'{}');
+DB.logs = DB.logs||{};      // key "w-d" -> {sets:{...}, ready, done}
+DB.food = DB.food||{};      // date -> [{t,txt,g}]
+DB.ready = DB.ready||{};    // date -> color
+DB.pos = DB.pos||{w:0,d:0}; // current view
+function save(){localStorage.setItem('b315',JSON.stringify(DB));}
+const todayKey=()=>new Date().toISOString().slice(0,10);
+
+let view = {...DB.pos};
+
+// ---------- READINESS ----------
+const READY={
+ green:{c:'var(--green)',t:'PUSH — go for it',d:'Recovered. Hit prescribed loads, chase the top set, consider +rep or +5lb.'},
+ yellow:{c:'var(--yellow)',t:'NORMAL — train as written',d:'Solid recovery. Execute the session as programmed at target RPE.'},
+ orange:{c:'var(--orange)',t:'MODERATE — pull back ~20%',d:'Under-recovered. Drop a back-off set, cap top set at RPE7, keep technique crisp.'},
+ red:{c:'var(--red)',t:'RECOVER — go light',d:'Poor recovery (low HRV / high resting HR / short sleep). Light technique work or rest. Strength is built on recovery.'},
+};
+DB.checkin=DB.checkin||{};
+// auto-pull today's readiness from the Garmin feed the morning task writes
+function syncFeed(){
+ const feed=window.READINESS_FEED||{};const t=todayKey();const f=feed[t];
+ if(!f)return false;
+ const tr=+f.tr||0;
+ if(!DB.checkin[t] || DB.checkin[t].tr!==tr){
+   DB.checkin[t]={tr,sleepHrs:f.sleepHrs||'',sleepScore:f.sleepScore||'',auto:true};
+   DB.ready[t]= tr>=80?'green':tr>=60?'yellow':tr>=40?'orange':'red';
+   save();
+ }
+ return true;
+}
+function computeCheckin(){
+ const g=id=>parseFloat(document.getElementById(id).value)||0;
+ const tr=g('ciTR'), sleepHrs=g('ciSleepHrs'), sleepScore=g('ciSleepScore');
+ const color = tr>=80?'green':tr>=60?'yellow':tr>=40?'orange':'red';
+ DB.checkin[todayKey()]={tr,sleepHrs,sleepScore};
+ DB.ready[todayKey()]=color;save();
+ let s='Readiness '+tr+'/100'+(sleepHrs?' · '+sleepHrs+'h sleep':'');
+ document.getElementById('ciStatus').textContent=s;
+ renderReady();
+}
+function loadCheckin(){const ci=DB.checkin[todayKey()];if(!ci)return;
+ const set=(id,v)=>{if(v)document.getElementById(id).value=v;};
+ set('ciTR',ci.tr);set('ciSleepHrs',ci.sleepHrs);set('ciSleepScore',ci.sleepScore);
+ if(ci.tr)document.getElementById('ciStatus').textContent=(ci.auto?'✓ Auto from Garmin · ':'')+'Readiness '+ci.tr+'/100'+(ci.sleepHrs?' · '+ci.sleepHrs+'h sleep':'');}
+function setReady(c){DB.ready[todayKey()]=c;save();renderReady();}
+function renderReady(){
+ const c=DB.ready[todayKey()];const card=document.getElementById('rDot');
+ if(!c){card.textContent='--';card.style.background='var(--line)';
+   document.getElementById('rTitle').textContent='Recovery: not set';
+   document.getElementById('rDesc').textContent="Tap a button (or I'll set it from your Garmin scrape each morning).";return;}
+ const r=READY[c];card.style.background=r.c;card.textContent=c==='green'?'GO':c==='yellow'?'OK':c==='orange'?'•':'REST';
+ document.getElementById('rTitle').textContent=r.t;
+ document.getElementById('rDesc').textContent=r.d;
+}
+
+// ---------- RENDER SESSION ----------
+function key(w,d){return w+'-'+d;}
+function renderSession(){
+ const w=view.w,d=view.d, day=WEEKS[w][d];
+ document.getElementById('sFocus').textContent=day.focus;
+ document.getElementById('sName').textContent=day.name;
+ document.getElementById('dLabel').textContent='W'+(w+1)+' D'+(d+1);
+ document.getElementById('sessNote').textContent='💡 '+day.note;
+ const log=DB.logs[key(w,d)]||{sets:{},exDone:{}};
+ // banner showing today's auto-adjustment
+ const ab=document.getElementById('adjBanner');const col=DB.ready[todayKey()];
+ if(col==='orange'){ab.innerHTML='<div class="adjust">⚙ Adjusted for moderate readiness: working loads ~7% lighter, one set trimmed per exercise.</div>';}
+ else if(col==='red'){ab.innerHTML='<div class="adjust red">⚙ Adjusted for low readiness: loads ~20% lighter, volume halved. Keep it light &amp; technical — or rest.</div>';}
+ else if(col==='green'){ab.innerHTML='<div class="adjust green">⚙ Green light: hit the prescribed numbers — if a top set flies up, take the optional +5 lb.</div>';}
+ else ab.innerHTML='';
+ const wrap=document.getElementById('exList');wrap.innerHTML='';
+ day.ex.forEach((ex,ei)=>{
+   const exDone=log.exDone&&log.exDone[ei];
+   const sets=adjustSets(ex.sets,col);
+   const div=document.createElement('div');div.className='ex'+(ex.main?' main':'')+(expanded.has(ei)?' open':'');
+   let h='<div class="ex-h">'
+     +'<div class="chk'+(exDone?' on':'')+'" onclick="toggleEx('+ei+',event)">✓</div>'
+     +'<div class="nm">'+ex.nm+'<span class="ex-sum">'+summarize(sets)+'</span><small>'+ex.sub+'</small></div>'
+     +'<div class="arrow" onclick="toggleOpen('+ei+',event)">▾</div>'
+     +'</div>';
+   h+='<div class="lbls"><span>Set</span><span>Prescribed</span><span>RPE</span><span>Got</span></div><div class="sets">';
+   sets.forEach((st,si)=>{
+     const id=ei+'_'+si; const sv=log.sets[id]||{};
+     const presc=(st.load?st.load+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'');
+     h+='<div class="setrow">'
+       +'<div class="sn">'+(si+1)+'</div>'
+       +'<div class="prescribe">'+presc+'</div>'
+       +'<div class="rpe">RPE<b>'+st.rpe+'</b></div>'
+       +'<input inputmode="numeric" placeholder="'+st.reps+'" value="'+(sv.areps||'')+'" onchange="logReps('+ei+','+si+',this.value)">'
+       +'</div>';
+   });
+   h+='</div>';div.innerHTML=h;wrap.appendChild(div);
+ });
+}
+// auto-scale prescribed sets to today's readiness color
+function adjustSets(sets,col){
+ if(!col||col==='green'||col==='yellow')return sets;
+ const f = col==='orange'?0.93:0.80;
+ let out = sets.map(s=>{
+   let load=s.load;
+   const m=String(load).match(/(\d+)\s*lb/);
+   if(m){const v=Math.round(+m[1]*f/5)*5; load=String(load).replace(/\d+\s*lb/, v+' lb');}
+   return {...s, load};
+ });
+ if(col==='orange'&&out.length>1) out=out.slice(0,out.length-1);          // trim a set
+ if(col==='red') out=out.slice(0, Math.max(1, Math.ceil(out.length/2)));  // halve volume
+ return out;
+}
+// compact scheme summary, grouping identical sets
+function summarize(sets){
+ const groups=[];
+ sets.forEach(s=>{const last=groups[groups.length-1];
+   const sig=s.reps+'|'+s.load+'|'+s.tag;
+   if(last&&last.sig===sig)last.n++;else groups.push({sig,n:1,s});});
+ return groups.map(g=>g.n+' × '+g.s.reps+(g.s.load?' @ '+g.s.load:'')+(g.s.tag?' ('+g.s.tag+')':'')).join('  +  ');
+}
+const expanded=new Set();
+function ensure(w,d){const k=key(w,d);if(!DB.logs[k])DB.logs[k]={sets:{},exDone:{}};if(!DB.logs[k].exDone)DB.logs[k].exDone={};return DB.logs[k];}
+function toggleEx(ei,e){if(e)e.stopPropagation();const l=ensure(view.w,view.d);l.exDone[ei]=!l.exDone[ei];save();renderSession();updateProgress();}
+function toggleOpen(ei,e){if(e)e.stopPropagation();expanded.has(ei)?expanded.delete(ei):expanded.add(ei);renderSession();}
+function logReps(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].areps=v;save();updateProgress();}
+function shiftDay(n){let idx=view.w*5+view.d+n;idx=Math.max(0,Math.min(29,idx));view.w=Math.floor(idx/5);view.d=idx%5;DB.pos={...view};save();renderSession();}
+
+// ---------- WEEK LIST ----------
+function renderWeek(){
+ const el=document.getElementById('weekList');el.innerHTML='';
+ WEEKS.forEach((days,w)=>{
+   days.forEach((day,d)=>{
+     const k=key(w,d);const log=DB.logs[k];
+     const total=day.ex.length;
+     let done=0;
+     if(log)day.ex.forEach((ex,ei)=>{if(log.exDone&&log.exDone[ei])done++;});
+     const isDone=done>=total&&total>0;
+     const row=document.createElement('div');row.className='weekrow'+(isDone?' done':'');
+     row.innerHTML='<div><b>'+(d===0?WK_LABELS[w]+'<br>':'')+'</b><span style="font-size:13px">D'+(d+1)+' · '+day.name+'</span><br><small>'+day.focus+'</small></div>'
+       +'<div class="pill">'+(isDone?'✓ done':done+'/'+total)+'</div>';
+     row.onclick=()=>{view={w,d};DB.pos={...view};save();renderSession();tab('today',document.querySelector('[data-t=today]'));};
+     el.appendChild(row);
+   });
+ });
+}
+
+// ---------- PROGRESS ----------
+let chart;
+// est 1RM from your heavy 4×4 — uses ACTUAL reps you logged (Epley), best completed set
+function collect1RM(){
+ const pts=[];
+ for(let w=0;w<6;w++){
+   const log=DB.logs[key(w,0)]; if(!log)continue;        // D1 = heavy bench
+   const exDone=log.exDone&&log.exDone[0];
+   if(w===5){if(exDone)pts.push({x:'W6',y:315}); continue;}
+   let best=0;
+   for(let si=0;si<4;si++){const s=log.sets['0_'+si];     // the four 4×4 work sets
+     const r = (s&&s.areps)?parseInt(s.areps):(exDone?4:0);
+     if(r>0)best=Math.max(best,Math.round(p44[w]*(1+r/30)));}
+   const primer={2:295,4:310}[w];                          // practice single weeks
+   if(primer){const s=log.sets['0_5']; if(exDone||(s&&s.areps))best=Math.max(best,primer);}
+   if(best)pts.push({x:'W'+(w+1), y:best});
+ }
+ return pts;
+}
+function updateProgress(){
+ const pts=collect1RM();
+ const best=pts.reduce((a,p)=>Math.max(a,p.y),START1RM);
+ document.getElementById('cur1rm').textContent=best;
+ const prog=Math.min(100,Math.round((best-200)/(GOAL-200)*100));
+ document.getElementById('goalbar').style.width=Math.max(8,Math.round((best/GOAL)*100))+'%';
+ document.getElementById('goallbl').textContent=best>=GOAL?'🎉 GOAL HIT — '+best+' lb!':(GOAL-best)+' lb to go · best est 1RM '+best+' lb';
+ document.getElementById('prBest').textContent=pts.length?('Best estimated 1RM: '+best+' lb — from your completed heavy 4×4 days (Epley).'):'Check off your heavy 4×4 each week and your estimated 1RM trend builds here automatically.';
+ // chart
+ const labels=pts.map(p=>p.x),data=pts.map(p=>p.y);
+ if(window.Chart){
+   const ctx=document.getElementById('chart');
+   if(chart)chart.destroy();
+   chart=new Chart(ctx,{type:'line',data:{labels,datasets:[
+     {label:'Est 1RM',data,borderColor:'#f0a020',backgroundColor:'rgba(240,160,32,.15)',fill:true,tension:.3,pointRadius:3},
+   ]},options:{plugins:{legend:{display:false},
+     annotation:false},
+     scales:{y:{suggestedMin:250,suggestedMax:320,grid:{color:'#283041'},ticks:{color:'#8b949e'}},
+       x:{grid:{display:false},ticks:{color:'#8b949e',maxRotation:0,autoSkip:true}}}}});
+ }
+ // weekly volume
+ const vol={};
+ for(let w=0;w<6;w++)for(let d=0;d<5;d++){const day=WEEKS[w][d];const log=DB.logs[key(w,d)];if(!log)continue;
+   day.ex.forEach((ex,ei)=>{if(!/bench/i.test(ex.nm))return;const ed=log.exDone&&log.exDone[ei];
+     ex.sets.forEach((st,si)=>{const s=log.sets[ei+'_'+si];if(ed||(s&&s.areps)){vol[w]=(vol[w]||0)+1;}});});}
+ document.getElementById('volList').innerHTML=Object.keys(vol).length?
+   Object.entries(vol).map(([w,n])=>'Week '+(+w+1)+': <b style="color:var(--accent)">'+n+'</b> bench sets').join('<br>')
+   :'Completed bench sets per week will show here (aim 10+).';
+}
+
+// ---------- FOOD ----------
+function addFood(txt){
+ const inp=document.getElementById('foodIn');
+ const t=txt||inp.value.trim();if(!t)return;if(!txt)inp.value='';
+ const g=(t.match(/(\d+)\s*g/i)||[])[1];
+ const d=todayKey();DB.food[d]=DB.food[d]||[];
+ DB.food[d].push({time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),txt:t,g:g?+g:0});
+ save();renderFood();
+}
+function renderFood(){
+ const d=todayKey();const list=DB.food[d]||[];
+ const prot=list.reduce((a,f)=>a+(f.g||0),0);
+ document.getElementById('mProt').textContent=prot;
+ document.getElementById('mProt').style.color=prot>=PROTEIN_TGT?'var(--green)':'var(--txt)';
+ document.getElementById('mTgt').textContent=PROTEIN_TGT;
+ document.getElementById('mMeals').textContent=list.length;
+ const el=document.getElementById('foodList');
+ el.innerHTML=list.length?list.map((f,i)=>'<div class="foodrow"><span>'+f.txt+(f.g?' <small>('+f.g+'g)</small>':'')+'</span><small>'+f.time+' ✕</small></div>').join(''):'<div class="empty">No meals logged today.</div>';
+ [...el.querySelectorAll('.foodrow')].forEach((row,i)=>row.querySelector('small:last-child').onclick=()=>{DB.food[d].splice(i,1);save();renderFood();});
+}
+
+// ---------- TABS ----------
+function tab(name,btn){
+ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+ document.getElementById('tab-'+name).classList.add('active');
+ document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+ btn.classList.add('active');
+ if(name==='progress')updateProgress();
+ if(name==='week')renderWeek();
+ if(name==='food')renderFood();
+ window.scrollTo(0,0);
+}
+
+// ---------- INIT ----------
+syncFeed();loadCheckin();renderReady();renderSession();updateProgress();renderFood();
+
+// ---- CLOUD: pull today's readiness published by the daily GitHub Action ----
+async function loadCloud(){
+ try{
+   const r=await fetch('data/today.json?_='+Date.now(),{cache:'no-store'});
+   if(!r.ok)return;
+   const d=await r.json();
+   if(!d||!d.date)return;
+   window.READINESS_FEED=window.READINESS_FEED||{};
+   window.READINESS_FEED[d.date]={tr:d.tr,sleepHrs:d.sleepHrs,sleepScore:d.sleepScore};
+   if(syncFeed()){loadCheckin();renderReady();renderSession();updateProgress();}
+   const el=document.getElementById('ciStatus');
+   if(el&&d.fetchedAt)el.textContent='✓ Auto from Garmin · Readiness '+d.tr+'/100';
+ }catch(e){/* offline: app still works with last data */}
+}
+loadCloud();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js').catch(()=>{});}
+
+</script>
+</body>
+</html>
