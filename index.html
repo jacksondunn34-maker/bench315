@@ -52,7 +52,7 @@ section{padding:0 16px}
 .sets,.lbls{display:none}
 .ex.open .sets{display:block;padding:0 10px 8px}
 .ex.open .lbls{display:grid}
-.setrow{display:grid;grid-template-columns:24px 1fr 40px 56px;gap:8px;align-items:center;padding:8px 4px;border-top:1px solid var(--line)}
+.setrow{display:grid;grid-template-columns:22px 1fr 48px 48px;gap:8px;align-items:center;padding:8px 4px;border-top:1px solid var(--line)}
 .setrow .sn{color:var(--muted);font-size:12px;text-align:center;font-weight:700}
 .setrow .prescribe{font-size:14px}
 .setrow .prescribe b{color:var(--accent);font-weight:700}
@@ -63,7 +63,7 @@ section{padding:0 16px}
 .setrow input::placeholder{color:#4b5563}
 .chk{width:34px;height:34px;border-radius:10px;border:2px solid var(--line);background:#0d1117;display:flex;align-items:center;justify-content:center;font-size:19px;color:transparent}
 .chk.on{background:var(--green);border-color:var(--green);color:#fff}
-.lbls{grid-template-columns:24px 1fr 40px 56px;gap:8px;padding:4px 4px 0;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+.lbls{grid-template-columns:22px 1fr 48px 48px;gap:8px;padding:4px 4px 0;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
 .lbls span:nth-child(2){text-align:left}
 .nav{position:fixed;bottom:0;left:0;right:0;max-width:560px;margin:0 auto;display:flex;background:var(--card);border-top:1px solid var(--line);padding:8px 4px env(safe-area-inset-bottom)}
 .nav button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;padding:6px 2px;font-weight:600}
@@ -223,9 +223,9 @@ const p44 = [255,260,265,270,275,'TEST'];
 // D4 volume bench (paused), ~68-72% — supports the 4×4 without a second max day.
 const pvol = [205,210,215,220,225,'light'];
 
-function buildWeek(w){ // w = 0..5
+function buildWeek(w, bw){ // w = 0..5 ; bw = adaptive heavy 4×4 weight
  const deload = (w===5);
- const pw=p44[w], vw=pvol[w];
+ const pw=bw||p44[w], vw=pvol[w];
  const primer={2:295,4:310}[w]; // practice singles in wk3 & wk5
  let heavyBench = deload
    ? mk(1,1,{load:'work to 315',rpe:10,tag:'TEST'})
@@ -278,8 +278,10 @@ function buildWeek(w){ // w = 0..5
   ]},
  ];
 }
-const WEEKS=[0,1,2,3,4,5].map(buildWeek);
-const WK_LABELS=['Wk1 · 4×4 @255','Wk2 · 4×4 @260','Wk3 · 4×4 @265 + single 295','Wk4 · 4×4 @270','Wk5 · 4×4 @275 + single 310','Wk6 · Deload + Test 315'];
+// heavy 4×4 weight is ADAPTIVE (APRE): your logged reps set next session's load.
+function weekBenchWeight(w){return (DB.bench.sessionWeights&&DB.bench.sessionWeights[w]!=null)?DB.bench.sessionWeights[w]:DB.bench.weight;}
+function currentWeeks(){return [0,1,2,3,4,5].map(w=>buildWeek(w, weekBenchWeight(w)));}
+const WK_LABELS=['Wk1 · 4×4 heavy','Wk2 · 4×4 heavy','Wk3 · 4×4 + single 295','Wk4 · 4×4 heavy','Wk5 · 4×4 + single 310','Wk6 · Deload + Test 315'];
 
 // ---------- STATE ----------
 const DB = JSON.parse(localStorage.getItem('b315')||'{}');
@@ -287,10 +289,83 @@ DB.logs = DB.logs||{};      // key "w-d" -> {sets:{...}, ready, done}
 DB.food = DB.food||{};      // date -> [{t,txt,g}]
 DB.ready = DB.ready||{};    // date -> color
 DB.pos = DB.pos||{w:0,d:0}; // current view
+DB.bench = DB.bench || {weight:255, progressed:{}, sessionWeights:{}, lastReco:''}; // APRE state
+DB.bench.progressed = DB.bench.progressed||{};
+DB.bench.sessionWeights = DB.bench.sessionWeights||{};
 function save(){localStorage.setItem('b315',JSON.stringify(DB));}
 const todayKey=()=>new Date().toISOString().slice(0,10);
 
 let view = {...DB.pos};
+
+// ---------- APRE: adaptive progression on the heavy 4×4 ----------
+const HEAVY_TARGET_REPS = 16;   // 4×4
+function heavyTotals(w){
+ // returns {total, count, maxRpe, complete} for the four 4×4 work sets of week w's heavy day
+ const log=DB.logs[key(w,0)]; if(!log) return null;
+ const ed=log.exDone&&log.exDone[0];
+ let total=0,count=0,maxRpe=0,entered=0;
+ for(let si=0;si<4;si++){const s=log.sets['0_'+si];
+   if(s&&s.areps){total+=parseInt(s.areps)||0;count++;entered++;if(s.arpe)maxRpe=Math.max(maxRpe,parseFloat(s.arpe));}
+   else if(ed){total+=4;count++;}
+ }
+ const complete = ed || entered>=4;
+ return {total,count,maxRpe,complete,exDone:ed};
+}
+function recoFromReps(total,maxRpe){
+ if(total>=HEAVY_TARGET_REPS && (!maxRpe||maxRpe<=8.5)) return {delta:5, msg:'all 16 clean → +5 lb next session'};
+ if(total>=HEAVY_TARGET_REPS) return {delta:0, msg:'16 reps but heavy (RPE high) → hold weight next session'};
+ if(total>=14) return {delta:0, msg:'14–15 reps → hold this weight next session'};
+ if(total>=12) return {delta:0, msg:'12–13 reps → repeat, drive bar speed'};
+ return {delta:-5, msg:'under 12 → drop 5 lb next session'};
+}
+// lock in progression once a heavy session is complete
+function applyProgression(){
+ for(let w=0;w<5;w++){ // weeks 0..4 (skip deload/test wk6)
+   const t=heavyTotals(w);
+   if(t && t.complete && !DB.bench.progressed[w]){
+     if(DB.bench.sessionWeights[w]==null) DB.bench.sessionWeights[w]=DB.bench.weight; // lock weight used
+     const r=recoFromReps(t.total,t.maxRpe);
+     DB.bench.weight=Math.max(135, DB.bench.weight + r.delta);
+     DB.bench.progressed[w]=true;
+     DB.bench.lastReco='Wk'+(w+1)+': '+r.msg+' → next heavy bench '+DB.bench.weight+' lb';
+     save();
+   }
+ }
+}
+// live mid-workout correction for the heavy day.
+// Philosophy: failure ISN'T bad — but failing EARLY in a 4×4 costs you the remaining
+// sets (lost quality volume). So we only pull back when an EARLY set (1–3) maxes out or
+// misses reps. A hard grind on the LAST set is encouraged, not corrected.
+function liveCorrection(w){
+ const day=currentWeeks()[w][0];
+ const targetRpe = day.ex[0].sets[0].rpe || 8;
+ const log=DB.logs[key(w,0)]; if(!log) return 'Log each set’s reps + RPE and I’ll coach you set by set.';
+ const LAST=3; // 4 work sets, index 0..3
+ let msg=null;
+ for(let si=0;si<4;si++){const s=log.sets['0_'+si]; if(!s) continue;
+   const rpe=parseFloat(s.arpe), reps=parseInt(s.areps);
+   const missed = reps && reps<4;
+   const maxed  = rpe && rpe>=9.5;
+   if(si<LAST && (missed||maxed)){
+     const setsLeft = LAST-si;
+     msg='⚠ Set '+(si+1)+' was '+(missed?'a missed rep':'basically a max (RPE '+rpe+')')+' with '+setsLeft+' set'+(setsLeft>1?'s':'')+' to go. Drop ~5–10 lb for the rest so you still get all 4 quality sets — that total volume is what drives the gain. (Saving the all-out effort for your last set is the move.)';
+     break;
+   }
+ }
+ if(!msg){
+   const s3=log.sets['0_3']; // the last set
+   if(s3 && (parseFloat(s3.arpe)>=9 || (parseInt(s3.areps)&&parseInt(s3.areps)<=4))){
+     msg='🔥 Hard last set — perfect. That’s exactly where the adaptation is; no need to back off when it’s the final set.';
+   } else {
+     let logged=0,easy=true;
+     for(let si=0;si<4;si++){const s=log.sets['0_'+si]; if(s&&(s.arpe||s.areps)){logged++; const rpe=parseFloat(s.arpe); if(!rpe||rpe>targetRpe-1.5)easy=false;}}
+     if(logged>=2 && easy) msg='🔥 Bar speed is fast (RPE under target). Finish as written — you’ll jump up next session.';
+     else if(logged>0) msg='On target — keep going, push the last set.';
+     else msg='Log each set’s reps + RPE and I’ll coach you set by set.';
+   }
+ }
+ return msg;
+}
 
 // ---------- READINESS ----------
 const READY={
@@ -340,6 +415,7 @@ function renderReady(){
 // ---------- RENDER SESSION ----------
 function key(w,d){return w+'-'+d;}
 function renderSession(){
+ const WEEKS=currentWeeks();
  const w=view.w,d=view.d, day=WEEKS[w][d];
  document.getElementById('sFocus').textContent=day.focus;
  document.getElementById('sName').textContent=day.name;
@@ -352,6 +428,7 @@ function renderSession(){
  else if(col==='red'){ab.innerHTML='<div class="adjust red">⚙ Adjusted for low readiness: loads ~20% lighter, volume halved. Keep it light &amp; technical — or rest.</div>';}
  else if(col==='green'){ab.innerHTML='<div class="adjust green">⚙ Green light: hit the prescribed numbers — if a top set flies up, take the optional +5 lb.</div>';}
  else ab.innerHTML='';
+ if(d===0 && w!==5){ ab.innerHTML += '<div class="adjust" style="background:rgba(59,130,246,.12);border-color:var(--accent2);color:#9ec5ff">🤖 '+liveCorrection(w)+(DB.bench.lastReco?'<br><span style="opacity:.75;font-size:11px">'+DB.bench.lastReco+'</span>':'')+'</div>'; }
  const wrap=document.getElementById('exList');wrap.innerHTML='';
  day.ex.forEach((ex,ei)=>{
    const exDone=log.exDone&&log.exDone[ei];
@@ -362,15 +439,15 @@ function renderSession(){
      +'<div class="nm">'+ex.nm+'<span class="ex-sum">'+summarize(sets)+'</span><small>'+ex.sub+'</small></div>'
      +'<div class="arrow" onclick="toggleOpen('+ei+',event)">▾</div>'
      +'</div>';
-   h+='<div class="lbls"><span>Set</span><span>Prescribed</span><span>RPE</span><span>Got</span></div><div class="sets">';
+   h+='<div class="lbls"><span>Set</span><span>Prescribed</span><span>Reps</span><span>RPE</span></div><div class="sets">';
    sets.forEach((st,si)=>{
      const id=ei+'_'+si; const sv=log.sets[id]||{};
-     const presc=(st.load?st.load+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'');
+     const presc=(st.load?st.load+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'')+' <small>@RPE'+st.rpe+'</small>';
      h+='<div class="setrow">'
        +'<div class="sn">'+(si+1)+'</div>'
        +'<div class="prescribe">'+presc+'</div>'
-       +'<div class="rpe">RPE<b>'+st.rpe+'</b></div>'
        +'<input inputmode="numeric" placeholder="'+st.reps+'" value="'+(sv.areps||'')+'" onchange="logReps('+ei+','+si+',this.value)">'
+       +'<input inputmode="decimal" placeholder="rpe" value="'+(sv.arpe||'')+'" onchange="logRPE('+ei+','+si+',this.value)">'
        +'</div>';
    });
    h+='</div>';div.innerHTML=h;wrap.appendChild(div);
@@ -402,11 +479,13 @@ const expanded=new Set();
 function ensure(w,d){const k=key(w,d);if(!DB.logs[k])DB.logs[k]={sets:{},exDone:{}};if(!DB.logs[k].exDone)DB.logs[k].exDone={};return DB.logs[k];}
 function toggleEx(ei,e){if(e)e.stopPropagation();const l=ensure(view.w,view.d);l.exDone[ei]=!l.exDone[ei];save();renderSession();updateProgress();}
 function toggleOpen(ei,e){if(e)e.stopPropagation();expanded.has(ei)?expanded.delete(ei):expanded.add(ei);renderSession();}
-function logReps(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].areps=v;save();updateProgress();}
+function logReps(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].areps=v;save();updateProgress();renderSession();}
+function logRPE(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].arpe=v;save();updateProgress();renderSession();}
 function shiftDay(n){let idx=view.w*5+view.d+n;idx=Math.max(0,Math.min(29,idx));view.w=Math.floor(idx/5);view.d=idx%5;DB.pos={...view};save();renderSession();}
 
 // ---------- WEEK LIST ----------
 function renderWeek(){
+ const WEEKS=currentWeeks();
  const el=document.getElementById('weekList');el.innerHTML='';
  WEEKS.forEach((days,w)=>{
    days.forEach((day,d)=>{
@@ -436,7 +515,7 @@ function collect1RM(){
    let best=0;
    for(let si=0;si<4;si++){const s=log.sets['0_'+si];     // the four 4×4 work sets
      const r = (s&&s.areps)?parseInt(s.areps):(exDone?4:0);
-     if(r>0)best=Math.max(best,Math.round(p44[w]*(1+r/30)));}
+     if(r>0)best=Math.max(best,Math.round(weekBenchWeight(w)*(1+r/30)));}
    const primer={2:295,4:310}[w];                          // practice single weeks
    if(primer){const s=log.sets['0_5']; if(exDone||(s&&s.areps))best=Math.max(best,primer);}
    if(best)pts.push({x:'W'+(w+1), y:best});
@@ -444,6 +523,7 @@ function collect1RM(){
  return pts;
 }
 function updateProgress(){
+ applyProgression();
  const pts=collect1RM();
  const best=pts.reduce((a,p)=>Math.max(a,p.y),START1RM);
  document.getElementById('cur1rm').textContent=best;
@@ -464,7 +544,7 @@ function updateProgress(){
        x:{grid:{display:false},ticks:{color:'#8b949e',maxRotation:0,autoSkip:true}}}}});
  }
  // weekly volume
- const vol={};
+ const vol={};const WEEKS=currentWeeks();
  for(let w=0;w<6;w++)for(let d=0;d<5;d++){const day=WEEKS[w][d];const log=DB.logs[key(w,d)];if(!log)continue;
    day.ex.forEach((ex,ei)=>{if(!/bench/i.test(ex.nm))return;const ed=log.exDone&&log.exDone[ei];
      ex.sets.forEach((st,si)=>{const s=log.sets[ei+'_'+si];if(ed||(s&&s.areps)){vol[w]=(vol[w]||0)+1;}});});}
@@ -521,7 +601,7 @@ async function loadCloud(){
    if(syncFeed()){loadCheckin();renderReady();renderSession();updateProgress();}
    const el=document.getElementById('ciStatus');
    if(el&&d.fetchedAt)el.textContent='✓ Auto from Garmin · Readiness '+d.tr+'/100';
- }catch(e){/* offline: app still works with last data */}
+ }catch(e){}
 }
 loadCloud();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js').catch(()=>{});}
