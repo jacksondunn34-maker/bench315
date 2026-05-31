@@ -52,7 +52,10 @@ section{padding:0 16px}
 .sets,.lbls{display:none}
 .ex.open .sets{display:block;padding:0 10px 8px}
 .ex.open .lbls{display:grid}
-.setrow{display:grid;grid-template-columns:22px 1fr 48px 48px;gap:8px;align-items:center;padding:8px 4px;border-top:1px solid var(--line)}
+.setrow{display:grid;grid-template-columns:15px 1fr 44px 36px 34px 14px;gap:5px;align-items:center;padding:8px 2px;border-top:1px solid var(--line)}
+.rmset{color:#6b7280;text-align:center;font-size:17px;line-height:1;cursor:pointer}
+.warmup{font-size:11.5px;color:#9ec5ff;background:rgba(59,130,246,.10);border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin:6px 2px}
+.addset{width:100%;margin:8px 0 2px;padding:8px;border:1px dashed var(--line);border-radius:9px;background:transparent;color:var(--muted);font-size:12px;font-weight:600}
 .setrow .sn{color:var(--muted);font-size:12px;text-align:center;font-weight:700}
 .setrow .prescribe{font-size:14px}
 .setrow .prescribe b{color:var(--accent);font-weight:700}
@@ -63,7 +66,7 @@ section{padding:0 16px}
 .setrow input::placeholder{color:#4b5563}
 .chk{width:34px;height:34px;border-radius:10px;border:2px solid var(--line);background:#0d1117;display:flex;align-items:center;justify-content:center;font-size:19px;color:transparent}
 .chk.on{background:var(--green);border-color:var(--green);color:#fff}
-.lbls{grid-template-columns:22px 1fr 48px 48px;gap:8px;padding:4px 4px 0;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+.lbls{grid-template-columns:15px 1fr 44px 36px 34px 14px;gap:5px;padding:4px 2px 0;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;text-align:center}
 .lbls span:nth-child(2){text-align:left}
 .nav{position:fixed;bottom:0;left:0;right:0;max-width:560px;margin:0 auto;display:flex;background:var(--card);border-top:1px solid var(--line);padding:8px 4px env(safe-area-inset-bottom)}
 .nav button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;padding:6px 2px;font-weight:600}
@@ -303,13 +306,13 @@ function heavyTotals(w){
  // returns {total, count, maxRpe, complete} for the four 4×4 work sets of week w's heavy day
  const log=DB.logs[key(w,0)]; if(!log) return null;
  const ed=log.exDone&&log.exDone[0];
- let total=0,count=0,maxRpe=0,entered=0;
+ let total=0,count=0,maxRpe=0,entered=0,usedWeight=0;
  for(let si=0;si<4;si++){const s=log.sets['0_'+si];
-   if(s&&s.areps){total+=parseInt(s.areps)||0;count++;entered++;if(s.arpe)maxRpe=Math.max(maxRpe,parseFloat(s.arpe));}
+   if(s&&s.areps){total+=parseInt(s.areps)||0;count++;entered++;if(s.arpe)maxRpe=Math.max(maxRpe,parseFloat(s.arpe));if(s.awt)usedWeight=Math.max(usedWeight,parseFloat(s.awt));}
    else if(ed){total+=4;count++;}
  }
  const complete = ed || entered>=4;
- return {total,count,maxRpe,complete,exDone:ed};
+ return {total,count,maxRpe,complete,exDone:ed,usedWeight};
 }
 function recoFromReps(total,maxRpe){
  if(total>=HEAVY_TARGET_REPS && (!maxRpe||maxRpe<=8.5)) return {delta:5, msg:'all 16 clean → +5 lb next session'};
@@ -323,9 +326,10 @@ function applyProgression(){
  for(let w=0;w<5;w++){ // weeks 0..4 (skip deload/test wk6)
    const t=heavyTotals(w);
    if(t && t.complete && !DB.bench.progressed[w]){
-     if(DB.bench.sessionWeights[w]==null) DB.bench.sessionWeights[w]=DB.bench.weight; // lock weight used
+     const used = t.usedWeight || DB.bench.weight;            // honor a heavier/lighter day
+     DB.bench.sessionWeights[w]=used;                          // lock the actual weight used
      const r=recoFromReps(t.total,t.maxRpe);
-     DB.bench.weight=Math.max(135, DB.bench.weight + r.delta);
+     DB.bench.weight=Math.max(135, used + r.delta);
      DB.bench.progressed[w]=true;
      DB.bench.lastReco='Wk'+(w+1)+': '+r.msg+' → next heavy bench '+DB.bench.weight+' lb';
      save();
@@ -439,17 +443,27 @@ function renderSession(){
      +'<div class="nm">'+ex.nm+'<span class="ex-sum">'+summarize(sets)+'</span><small>'+ex.sub+'</small></div>'
      +'<div class="arrow" onclick="toggleOpen('+ei+',event)">▾</div>'
      +'</div>';
-   h+='<div class="lbls"><span>Set</span><span>Prescribed</span><span>Reps</span><span>RPE</span></div><div class="sets">';
-   sets.forEach((st,si)=>{
-     const id=ei+'_'+si; const sv=log.sets[id]||{};
-     const presc=(st.load?st.load+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'')+' <small>@RPE'+st.rpe+'</small>';
+   h+='<div class="lbls"><span>Set</span><span>Prescribed</span><span>Wt</span><span>Reps</span><span>RPE</span><span></span></div><div class="sets">';
+   if(ei===0){ const wl=(String((sets[0]||{}).load).match(/(\d+)/)||[])[1];
+     h+='<div class="warmup">🔥 '+(wl?warmupRamp(wl):'Warm-up: 2–3 progressively heavier sets before your work sets.')+'</div>'; }
+   const removed=(log.removed&&log.removed[ei])||[];
+   const extra=(log.extra&&log.extra[ei])||0;
+   const total=sets.length+extra;
+   for(let si=0; si<total; si++){
+     if(removed.indexOf(si)>=0) continue;
+     const st=sets[si]; const id=ei+'_'+si; const sv=log.sets[id]||{};
+     const wtPh=st?((String(st.load).match(/(\d+)/)||[])[1]||'lb'):'lb';
+     const presc=st?((st.load?st.load+' · ':'')+'<b>'+st.reps+(typeof st.reps==='number'?' reps':'')+'</b>'+(st.tag?' <small>('+st.tag+')</small>':'')+' <small>@RPE'+st.rpe+'</small>'):'<small style="color:var(--muted)">added set</small>';
      h+='<div class="setrow">'
        +'<div class="sn">'+(si+1)+'</div>'
        +'<div class="prescribe">'+presc+'</div>'
-       +'<input inputmode="numeric" placeholder="'+st.reps+'" value="'+(sv.areps||'')+'" onchange="logReps('+ei+','+si+',this.value)">'
+       +'<input inputmode="numeric" placeholder="'+wtPh+'" value="'+(sv.awt||'')+'" onchange="logWt('+ei+','+si+',this.value)">'
+       +'<input inputmode="numeric" placeholder="'+(st?st.reps:'reps')+'" value="'+(sv.areps||'')+'" onchange="logReps('+ei+','+si+',this.value)">'
        +'<input inputmode="decimal" placeholder="rpe" value="'+(sv.arpe||'')+'" onchange="logRPE('+ei+','+si+',this.value)">'
+       +'<div class="rmset" onclick="removeSet('+ei+','+si+')">×</div>'
        +'</div>';
-   });
+   }
+   h+='<button class="addset" onclick="addSet('+ei+',event)">+ Add set</button>';
    h+='</div>';div.innerHTML=h;wrap.appendChild(div);
  });
 }
@@ -476,11 +490,20 @@ function summarize(sets){
  return groups.map(g=>g.n+' × '+g.s.reps+(g.s.load?' @ '+g.s.load:'')+(g.s.tag?' ('+g.s.tag+')':'')).join('  +  ');
 }
 const expanded=new Set();
-function ensure(w,d){const k=key(w,d);if(!DB.logs[k])DB.logs[k]={sets:{},exDone:{}};if(!DB.logs[k].exDone)DB.logs[k].exDone={};return DB.logs[k];}
+function ensure(w,d){const k=key(w,d);if(!DB.logs[k])DB.logs[k]={sets:{},exDone:{}};const L=DB.logs[k];L.exDone=L.exDone||{};L.extra=L.extra||{};L.removed=L.removed||{};return L;}
 function toggleEx(ei,e){if(e)e.stopPropagation();const l=ensure(view.w,view.d);l.exDone[ei]=!l.exDone[ei];save();renderSession();updateProgress();}
 function toggleOpen(ei,e){if(e)e.stopPropagation();expanded.has(ei)?expanded.delete(ei):expanded.add(ei);renderSession();}
 function logReps(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].areps=v;save();updateProgress();renderSession();}
 function logRPE(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].arpe=v;save();updateProgress();renderSession();}
+function logWt(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].awt=v;save();updateProgress();renderSession();}
+function addSet(ei,e){if(e)e.stopPropagation();const l=ensure(view.w,view.d);l.extra[ei]=(l.extra[ei]||0)+1;save();renderSession();}
+function removeSet(ei,si){const l=ensure(view.w,view.d);l.removed[ei]=l.removed[ei]||[];if(l.removed[ei].indexOf(si)<0)l.removed[ei].push(si);save();updateProgress();renderSession();}
+// warm-up ramp from the working weight
+function warmupRamp(workWeight){
+ const w=parseInt(workWeight)||0; if(!w) return 'Warm-up: 2–3 progressively heavier sets.';
+ const r=p=>Math.round(w*p/5)*5;
+ return 'Warm-up: 45×10 · '+r(.5)+'×5 · '+r(.7)+'×3 · '+r(.85)+'×2 → work sets';
+}
 function shiftDay(n){let idx=view.w*5+view.d+n;idx=Math.max(0,Math.min(29,idx));view.w=Math.floor(idx/5);view.d=idx%5;DB.pos={...view};save();renderSession();}
 
 // ---------- WEEK LIST ----------
@@ -515,7 +538,8 @@ function collect1RM(){
    let best=0;
    for(let si=0;si<4;si++){const s=log.sets['0_'+si];     // the four 4×4 work sets
      const r = (s&&s.areps)?parseInt(s.areps):(exDone?4:0);
-     if(r>0)best=Math.max(best,Math.round(weekBenchWeight(w)*(1+r/30)));}
+     const wt = (s&&s.awt)?parseFloat(s.awt):weekBenchWeight(w);
+     if(r>0)best=Math.max(best,Math.round(wt*(1+r/30)));}
    const primer={2:295,4:310}[w];                          // practice single weeks
    if(primer){const s=log.sets['0_5']; if(exDone||(s&&s.areps))best=Math.max(best,primer);}
    if(best)pts.push({x:'W'+(w+1), y:best});
@@ -589,13 +613,10 @@ function tab(name,btn){
 // ---------- INIT ----------
 syncFeed();loadCheckin();renderReady();renderSession();updateProgress();renderFood();
 
-// ---- CLOUD: pull today's readiness published by the daily GitHub Action ----
 async function loadCloud(){
  try{
    const r=await fetch('data/today.json?_='+Date.now(),{cache:'no-store'});
-   if(!r.ok)return;
-   const d=await r.json();
-   if(!d||!d.date)return;
+   if(!r.ok)return;const d=await r.json();if(!d||!d.date)return;
    window.READINESS_FEED=window.READINESS_FEED||{};
    window.READINESS_FEED[d.date]={tr:d.tr,sleepHrs:d.sleepHrs,sleepScore:d.sleepScore};
    if(syncFeed()){loadCheckin();renderReady();renderSession();updateProgress();}
