@@ -5,29 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0d1117">
+<meta name="theme-color" content="#0a1a2f">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="Bench 315">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <title>Bench 315</title>
 <style>
 :root{
-  --bg:#0d1117;--card:#161b22;--card2:#1c2230;--line:#283041;
-  --txt:#e6edf3;--muted:#8b949e;--accent:#f0a020;--accent2:#3b82f6;
-  --green:#2ea043;--yellow:#d29922;--orange:#db6d28;--red:#da3633;
+  --bg:#0a1a2f;--card:#11283f;--card2:#16314d;--line:#1e3a5a;
+  --txt:#e8f1fb;--muted:#7d97b5;--accent:#38bdf8;--accent2:#2dd4bf;
+  --green:#34d399;--yellow:#fbbf24;--orange:#fb923c;--red:#f87171;
   --radius:16px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--txt);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 body{padding:0 0 90px;max-width:560px;margin:0 auto;}
-header{padding:18px 16px 10px;position:sticky;top:0;background:linear-gradient(180deg,#0d1117 70%,rgba(13,17,23,0));z-index:5}
+.h-title,.h-goal b,.sess-head h2,.sess-head .focus,h3.sec,.macro .m b,.ex-h .nm,.r-txt b,.dot,.excomplete,.finishlift,.weekrow b{
+  font-family:'Oswald','Inter',sans-serif;letter-spacing:.4px;}
+header{padding:18px 16px 10px;position:sticky;top:0;background:linear-gradient(180deg,#0a1a2f 70%,rgba(10,26,47,0));z-index:5}
 .h-title{font-size:13px;letter-spacing:2px;color:var(--accent);font-weight:700;text-transform:uppercase}
 .h-goal{display:flex;align-items:baseline;gap:8px;margin-top:2px}
 .h-goal b{font-size:30px;font-weight:800}
 .h-goal span{color:var(--muted);font-size:14px}
 .bar{height:8px;background:var(--line);border-radius:6px;margin-top:10px;overflow:hidden}
-.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#f7c948);border-radius:6px;transition:width .6s}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;transition:width .6s}
 .bar-lbl{font-size:11px;color:var(--muted);margin-top:5px}
 section{padding:0 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:12px 0}
@@ -694,7 +698,7 @@ function updateProgress(){
    const ctx=document.getElementById('chart');
    if(chart)chart.destroy();
    chart=new Chart(ctx,{type:'line',data:{labels,datasets:[
-     {label:'Est 1RM',data,borderColor:'#f0a020',backgroundColor:'rgba(240,160,32,.15)',fill:true,tension:.3,pointRadius:3},
+     {label:'Est 1RM',data,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.15)',fill:true,tension:.3,pointRadius:3},
    ]},options:{plugins:{legend:{display:false},
      annotation:false},
      scales:{y:{suggestedMin:250,suggestedMax:320,grid:{color:'#283041'},ticks:{color:'#8b949e'}},
