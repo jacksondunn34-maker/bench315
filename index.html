@@ -56,7 +56,8 @@ section{padding:0 16px}
 .rmset{color:#6b7280;text-align:center;font-size:17px;line-height:1;cursor:pointer}
 .warmup{font-size:11.5px;color:#9ec5ff;background:rgba(59,130,246,.10);border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin:6px 2px}
 .addset{width:100%;margin:8px 0 2px;padding:8px;border:1px dashed var(--line);border-radius:9px;background:transparent;color:var(--muted);font-size:12px;font-weight:600}
-.excomplete{width:calc(100% - 24px);margin:10px 12px 14px;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-size:14px;font-weight:800}
+.excomplete{display:none;width:calc(100% - 24px);margin:10px 12px 14px;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-size:14px;font-weight:800}
+.ex.open .excomplete{display:block}
 .excomplete.done{background:transparent;border:1px solid var(--green);color:var(--green)}
 .finishlift{width:100%;margin:18px 0 10px;padding:16px;border:none;border-radius:14px;background:linear-gradient(90deg,#2ea043,#3fb950);color:#fff;font-size:16px;font-weight:800;box-shadow:0 4px 16px rgba(46,160,67,.3)}
 .finhint{text-align:center;color:var(--muted);font-size:12px;margin:18px 0 10px}
