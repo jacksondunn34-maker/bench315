@@ -56,6 +56,15 @@ section{padding:0 16px}
 .rmset{color:#6b7280;text-align:center;font-size:17px;line-height:1;cursor:pointer}
 .warmup{font-size:11.5px;color:#9ec5ff;background:rgba(59,130,246,.10);border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin:6px 2px}
 .addset{width:100%;margin:8px 0 2px;padding:8px;border:1px dashed var(--line);border-radius:9px;background:transparent;color:var(--muted);font-size:12px;font-weight:600}
+.excomplete{width:calc(100% - 24px);margin:10px 12px 14px;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-size:14px;font-weight:800}
+.excomplete.done{background:transparent;border:1px solid var(--green);color:var(--green)}
+.finishlift{width:100%;margin:18px 0 10px;padding:16px;border:none;border-radius:14px;background:linear-gradient(90deg,#2ea043,#3fb950);color:#fff;font-size:16px;font-weight:800;box-shadow:0 4px 16px rgba(46,160,67,.3)}
+.finhint{text-align:center;color:var(--muted);font-size:12px;margin:18px 0 10px}
+.swaprow{display:none;padding:8px 12px 2px;font-size:12px;color:var(--muted);align-items:center;gap:6px}
+.ex.open .swaprow{display:flex}
+.swaprow select{flex:1;background:#0d1117;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px;font-size:13px}
+.ex.done{opacity:.62}
+.okmark{color:var(--green);font-weight:800}
 .setrow .sn{color:var(--muted);font-size:12px;text-align:center;font-weight:700}
 .setrow .prescribe{font-size:14px}
 .setrow .prescribe b{color:var(--accent);font-weight:700}
@@ -308,6 +317,62 @@ function liftWeight(name){
  if(DB.lifts[name]&&DB.lifts[name].weight) return DB.lifts[name].weight;
  const s=SEED[name]; return (s===undefined?null:(s||null));
 }
+// alternative-exercise menus (first item is the default; user can also type their own)
+const ALTS={
+ 'Bench Press':['Bench Press','Floor Press','Spoto Press','Larsen Press','Close-Grip Bench Press'],
+ 'Close-Grip Bench Press':['Close-Grip Bench Press','JM Press','Board Press','Floor Press'],
+ 'Incline DB Press':['Incline DB Press','Incline Barbell Press','Machine Incline Press','Flat DB Press'],
+ 'Weighted Dips':['Weighted Dips','Dip Machine','Close-Grip Push-up'],
+ 'Overhead Rope Extension':['Overhead Rope Extension','Skullcrusher','EZ-Bar Overhead Extension','Triceps Pushdown'],
+ 'Cable Fly':['Cable Fly','Pec Deck','DB Fly','Machine Chest Press'],
+ 'Barbell Row':['Barbell Row','Pendlay Row','DB Row','T-Bar Row','Chest-Supported Row'],
+ 'Pull-ups':['Pull-ups','Lat Pulldown','Assisted Pull-up','Chin-ups'],
+ 'Lat Pulldown':['Lat Pulldown','Pull-ups','Straight-Arm Pulldown'],
+ 'Chest-Supported Row':['Chest-Supported Row','Seal Row','Machine Row','DB Row'],
+ 'Face Pulls':['Face Pulls','Rear Delt Fly','Band Pull-apart'],
+ 'Barbell Curl':['Barbell Curl','EZ-Bar Curl','DB Curl','Cable Curl'],
+ 'Hammer Curl':['Hammer Curl','Rope Hammer Curl','DB Curl'],
+ 'Back Squat':['Back Squat','Front Squat','Hack Squat','Leg Press','Goblet Squat'],
+ 'Romanian Deadlift':['Romanian Deadlift','Deadlift','Good Morning','Leg Curl'],
+ 'Leg Press':['Leg Press','Hack Squat','Walking Lunge','Bulgarian Split Squat'],
+ 'Leg Curl':['Leg Curl','Nordic Curl','Seated Leg Curl'],
+ 'Standing Calf Raise':['Standing Calf Raise','Seated Calf Raise','Leg-Press Calf Raise'],
+ 'Hanging Leg Raise':['Hanging Leg Raise','Cable Crunch','Ab Wheel','Plank'],
+ 'Paused Bench Press':['Paused Bench Press','Bench Press','Spoto Press','Floor Press'],
+ 'Pin Press':['Pin Press','Board Press','Floor Press','Close-Grip Bench Press'],
+ 'Overhead Press':['Overhead Press','Seated DB Shoulder Press','Push Press','Machine Shoulder Press'],
+ 'JM Press':['JM Press','Skullcrusher','Close-Grip Bench Press','Tate Press'],
+ 'Lateral Raise':['Lateral Raise','Cable Lateral Raise','Machine Lateral Raise'],
+ 'Seated DB Shoulder Press':['Seated DB Shoulder Press','Overhead Press','Arnold Press','Machine Shoulder Press'],
+ 'Skullcrusher':['Skullcrusher','Overhead Rope Extension','JM Press','Cable Pushdown'],
+ 'Triceps Pushdown':['Triceps Pushdown','Overhead Rope Extension','Skullcrusher','Dips'],
+ 'Rear Delt Fly':['Rear Delt Fly','Face Pulls','Reverse Pec Deck']
+};
+// fuzzy aliases so a typed name maps to a known lift (keeps its weight memory)
+const ALIAS={'pec deck':'Pec Deck','machine fly':'Pec Deck','reverse pec':'Reverse Pec Deck','db fly':'DB Fly','dumbbell fly':'DB Fly',
+ 'incline barbell':'Incline Barbell Press','incline bb':'Incline Barbell Press','flat db':'Flat DB Press','arnold':'Arnold Press',
+ 'hack squat':'Hack Squat','front squat':'Front Squat','goblet':'Goblet Squat','lunge':'Walking Lunge','split squat':'Bulgarian Split Squat',
+ 'pendlay':'Pendlay Row','t-bar':'T-Bar Row','tbar':'T-Bar Row','db row':'DB Row','seal row':'Seal Row','machine row':'Machine Row',
+ 'chin':'Chin-ups','pulldown':'Lat Pulldown','straight arm':'Straight-Arm Pulldown','board press':'Board Press','floor press':'Floor Press',
+ 'spoto':'Spoto Press','larsen':'Larsen Press','push press':'Push Press','jm':'JM Press','tate':'Tate Press','skull':'Skullcrusher',
+ 'pushdown':'Triceps Pushdown','rope':'Overhead Rope Extension','dip':'Weighted Dips','cable curl':'Cable Curl','ez':'EZ-Bar Curl',
+ 'hammer':'Hammer Curl','calf':'Standing Calf Raise','nordic':'Nordic Curl','good morning':'Good Morning','deadlift':'Deadlift',
+ 'cable crunch':'Cable Crunch','ab wheel':'Ab Wheel','plank':'Plank'};
+function resolveAlias(t){const s=t.toLowerCase().trim();for(const k in ALIAS){if(s.indexOf(k)>=0)return ALIAS[k];}return t.replace(/\b\w/g,c=>c.toUpperCase());}
+function swapSelect(ei,current,orig){
+ let list=(ALTS[orig]||[orig]).slice();
+ if(list.indexOf(orig)<0)list.unshift(orig);
+ if(list.indexOf(current)<0)list.unshift(current);
+ let opts=list.map(a=>'<option'+(a===current?' selected':'')+'>'+a+'</option>').join('');
+ opts+='<option value="__other">Other (type it)…</option>';
+ return 'Swap: <select onchange="swapEx('+ei+',this.value)" onclick="event.stopPropagation()">'+opts+'</select>';
+}
+function swapEx(ei,val){const l=ensure(view.w,view.d);l.swap=l.swap||{};
+ if(val==='__other'){const t=prompt('What are you doing instead? (e.g. pec deck)');if(!t){renderSession();return;}val=resolveAlias(t);}
+ const orig=currentWeeks()[view.w][view.d].ex[ei].nm;
+ if(val===orig)delete l.swap[ei];else l.swap[ei]=val;
+ save();renderSession();updateProgress();}
+function finishLift(){const l=ensure(view.w,view.d);l.finished=true;save();updateProgress();shiftDay(1);window.scrollTo(0,0);}
 function save(){localStorage.setItem('b315',JSON.stringify(DB));}
 const todayKey=()=>new Date().toISOString().slice(0,10);
 
@@ -358,6 +423,7 @@ function learnLifts(){
    if(!WK[w]||!WK[w][d]) continue;
    WK[w][d].ex.forEach((ex,ei)=>{
      if(d===0&&ei===0&&w!==5) return;       // heavy bench handled by APRE
+     const nm=(log.swap&&log.swap[ei])||ex.nm;
      let bestW=0,hit=false,n=0,sumRpe=0;
      ex.sets.forEach((st,si)=>{const s=log.sets[ei+'_'+si];
        if(s&&s.awt){const wt=parseFloat(s.awt)||0; if(wt>bestW)bestW=wt;
@@ -369,7 +435,7 @@ function learnLifts(){
        if(hit && avg && avg<=7.5) next=bestW+5;        // easy → progress
        else if(hit && avg && avg<=8.5) next=bestW+5;   // solid → small bump
        next=Math.round(next/5)*5;
-       DB.lifts[ex.nm]={weight:next, used:bestW};
+       DB.lifts[nm]={weight:next, used:bestW};
      }
    });
  }
@@ -475,18 +541,19 @@ function renderSession(){
  const wrap=document.getElementById('exList');wrap.innerHTML='';
  day.ex.forEach((ex,ei)=>{
    const exDone=log.exDone&&log.exDone[ei];
+   const dispName=(log.swap&&log.swap[ei])||ex.nm;
    const sets=adjustSets(ex.sets,col);
-   const div=document.createElement('div');div.className='ex'+(ex.main?' main':'')+(expanded.has(ei)?' open':'');
-   let h='<div class="ex-h">'
-     +'<div class="chk'+(exDone?' on':'')+'" onclick="toggleEx('+ei+',event)">✓</div>'
-     +'<div class="nm">'+ex.nm+'<span class="ex-sum">'+summarize(sets)+'</span><small>'+ex.sub+'</small></div>'
-     +'<div class="arrow" onclick="toggleOpen('+ei+',event)">▾</div>'
+   const div=document.createElement('div');div.className='ex'+(ex.main?' main':'')+(expanded.has(ei)?' open':'')+(exDone?' done':'');
+   let h='<div class="ex-h" onclick="toggleOpen('+ei+',event)">'
+     +'<div class="nm">'+dispName+(exDone?' <span class="okmark">✓</span>':'')+'<span class="ex-sum">'+summarize(sets)+'</span><small>'+ex.sub+(dispName!==ex.nm?' · swapped from '+ex.nm:'')+'</small></div>'
+     +'<div class="arrow">▾</div>'
      +'</div>';
+   h+='<div class="swaprow">'+swapSelect(ei,dispName,ex.nm)+'</div>';
    h+='<div class="lbls"><span>Set</span><span>Prescribed</span><span>Wt</span><span>Reps</span><span>RPE</span><span></span></div><div class="sets">';
    const removed=(log.removed&&log.removed[ei])||[];
    const extra=(log.extra&&log.extra[ei])||0;
    const total=sets.length+extra;
-   const exBase=(d===0&&ei===0&&w!==5)?null:liftWeight(ex.nm); // learned/seed weight for non-heavy-bench lifts
+   const exBase=(d===0&&ei===0&&w!==5)?null:liftWeight(dispName); // learned/seed weight for non-heavy-bench lifts
    let prevBase=null, prevDisp=null, prevTReps=null, prevTRpe=null, prevLog=null;
    for(let si=0; si<total; si++){
      if(removed.indexOf(si)>=0) continue;
@@ -514,8 +581,17 @@ function renderSession(){
      prevBase=baseW; prevDisp=dispW; prevTReps=st?st.reps:null; prevTRpe=st?st.rpe:null; prevLog=log.sets[id];
    }
    h+='<button class="addset" onclick="addSet('+ei+',event)">+ Add set</button>';
-   h+='</div>';div.innerHTML=h;wrap.appendChild(div);
+   h+='</div>'; // close .sets
+   h+='<button class="excomplete'+(exDone?' done':'')+'" onclick="toggleEx('+ei+',event)">'+(exDone?'✓ Completed — tap to undo':'Exercise complete')+'</button>';
+   div.innerHTML=h;wrap.appendChild(div);
  });
+ // finish-lift button once every exercise is complete
+ const allDone = day.ex.length>0 && day.ex.every((ex,ei)=>log.exDone&&log.exDone[ei]);
+ const fin=document.createElement('div');
+ fin.innerHTML = allDone
+   ? '<button class="finishlift" onclick="finishLift()">🏁 Finish lift — go to next session</button>'
+   : '<div class="finhint">Tap “Exercise complete” on each lift, then finish the day.</div>';
+ wrap.appendChild(fin);
 }
 // auto-scale prescribed sets to today's readiness color
 function adjustSets(sets,col){
@@ -540,8 +616,8 @@ function summarize(sets){
  return groups.map(g=>g.n+' × '+g.s.reps+(g.s.load?' @ '+g.s.load:'')+(g.s.tag?' ('+g.s.tag+')':'')).join('  +  ');
 }
 const expanded=new Set();
-function ensure(w,d){const k=key(w,d);if(!DB.logs[k])DB.logs[k]={sets:{},exDone:{}};const L=DB.logs[k];L.exDone=L.exDone||{};L.extra=L.extra||{};L.removed=L.removed||{};return L;}
-function toggleEx(ei,e){if(e)e.stopPropagation();const l=ensure(view.w,view.d);l.exDone[ei]=!l.exDone[ei];save();renderSession();updateProgress();}
+function ensure(w,d){const k=key(w,d);if(!DB.logs[k])DB.logs[k]={sets:{},exDone:{}};const L=DB.logs[k];L.exDone=L.exDone||{};L.extra=L.extra||{};L.removed=L.removed||{};L.swap=L.swap||{};return L;}
+function toggleEx(ei,e){if(e)e.stopPropagation();const l=ensure(view.w,view.d);l.exDone[ei]=!l.exDone[ei];if(l.exDone[ei])expanded.delete(ei);save();renderSession();updateProgress();}
 function toggleOpen(ei,e){if(e)e.stopPropagation();expanded.has(ei)?expanded.delete(ei):expanded.add(ei);renderSession();}
 function logReps(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].areps=v;save();updateProgress();renderSession();}
 function logRPE(ei,si,v){const l=ensure(view.w,view.d);const id=ei+'_'+si;l.sets[id]=l.sets[id]||{};l.sets[id].arpe=v;save();updateProgress();renderSession();}
